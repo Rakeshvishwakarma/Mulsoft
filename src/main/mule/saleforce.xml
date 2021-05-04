@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:api-gateway="http://www.mulesoft.org/schema/mule/api-gateway" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/api-gateway http://www.mulesoft.org/schema/mule/api-gateway/current/mule-api-gateway.xsd">
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="68982b03-7902-4e80-a3ee-61c994261445" >
+		<salesforce:basic-connection username="rakesh.a.vishwakarma@capgemini.com" password="Rk@nchan143" securityToken="lgL4jwLvgltwKJQvnlwx2tbeH" />
+	</salesforce:sfdc-config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="fcb841d7-602f-48d3-a0ad-c828ef263320" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<api-gateway:autodiscovery apiId="16797426" ignoreBasePath="true" doc:name="API Autodiscovery" doc:id="9cf52cc8-78b0-4d46-a195-05f24099b35d" flowRef="SelectQuery" />
+	<flow name="InsertData" doc:id="bcad1ad6-14a4-4281-956c-ac9e5d11a1d6" >
+		<http:listener doc:name="Listener" doc:id="c2ca4b67-ef88-40fb-b57d-f3359625bda4" config-ref="HTTP_Listener_config" path="/salesforce"/>
+		<ee:transform doc:name="Transform Message" doc:id="33a08b1c-319a-47b0-88b3-564134fe42e8" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create type="Lead" doc:name="Create" doc:id="c58acc82-4819-450a-b821-121a8fd9a6e4" config-ref="Salesforce_Config">
+			<salesforce:records ><![CDATA[#[[payload]]]]></salesforce:records>
+		</salesforce:create>
+		<ee:transform doc:name="Transform Message" doc:id="be2cc3cf-2b6e-4c1d-9473-49a8a845e88f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="1c345269-c659-4139-bf63-79b0605ad018" message="Fulllll"/>
+	</flow>
+	<flow name="SelectQuery" doc:id="6af6dd9d-f8c1-4932-ad92-844ac648aebb" >
+		<http:listener doc:name="Listener" doc:id="2a17f70b-0a2d-4a1b-bc8e-e80c5c1035f7" config-ref="HTTP_Listener_config" path="/Query"/>
+		<salesforce:query doc:name="Query" doc:id="bd28ab8e-5855-433a-9d29-facad807973e" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[Select Id, FirstName, LastName, Email, Phone from Lead limit 100]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="775b666a-5b52-4841-9cb1-df39e6dc5877" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="Update" doc:id="eeb94f3f-fbdf-4c2c-a6cc-d53606fbc5c9" >
+		<http:listener doc:name="Listener" doc:id="88ca38ca-fba5-4a58-8c38-392ba44deca2" config-ref="HTTP_Listener_config" path="/update" allowedMethods="PUT"/>
+		<ee:transform doc:name="Transform Message" doc:id="8f92d945-0637-4379-94bd-abfd5af1d95d" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	
+}
+]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="updatedPayload" ><![CDATA[%dw 2.0
+output application/java
+---
+{
+	
+	"Email":payload.Email,
+	"FirstName":payload.FirstName,
+	"LastName":payload.LastName,
+	"Phone":payload.Phone
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<salesforce:query doc:name="Query" doc:id="97ac2cc7-2a5a-4717-ab07-4f277f1155ab" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query ><![CDATA[Select Id, FirstName, LastName, Phone from Lead where Email=':email']]></salesforce:salesforce-query>
+			<salesforce:parameters ><![CDATA[#[output application/java
+---
+{
+	email : vars.updatedPayload.Email
+}]]]></salesforce:parameters>
+		</salesforce:query>
+		<ee:transform doc:name="Transform Message" doc:id="1394b9be-ce4d-4d94-94dc-e17d8af3b494" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+"Email": vars.updatedPayload.Email,
+"FirstName": vars.updatedPayload.FirstName,
+"Phone": vars.updatedPayload.Phone,
+"LastName": vars.updatedPayload.LastName,
+"Id":payload.Id
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:update doc:name="Update" doc:id="5f8dd8ac-d9ad-446a-8200-9b1f6828fdc5" config-ref="Salesforce_Config" type="Lead">
+			<salesforce:records ><![CDATA[#[[payload]]]]></salesforce:records>
+		</salesforce:update>
+		<ee:transform doc:name="Transform Message" doc:id="fe99eaf4-a459-49d2-ae42-daa854ef95c6" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
